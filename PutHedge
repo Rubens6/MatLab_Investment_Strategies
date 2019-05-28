@@ -1,0 +1,34 @@
+git remote add origin https://github.com/Rubens6/MatLab_Investment_Strategies.git
+git push -u origin master
+
+%%1:1 Put-Hedge 
+ 
+clear;clc;
+ 
+par.Laufzeit = 30
+ 
+[idxVals, secNames]     = xlsread('YOUR FILE','Array (e.g. A:A)')
+log_R     = log(idxVals(2:end)./idxVals(1:end-1));
+
+par.v = std(log_R);
+par.m = mean(log_R);
+par.Sparbetrag = 1000;
+par.Spar_1 = 1000;
+par.I = 10000;
+par.SP_0 = 100;
+par.rf = exp(0.01)/12;
+ 
+%%% Function and simulaiton must be defined elsewhere
+[V,R_t] = PutHedge(par);      
+
+%%  Shortfall Maß
+
+SW1     = sum(V(:,end)<30000)/par.I
+SE1     = sum(max(30000-V(:,end),0))/par.I
+MEL1    = (sum(max(30000-V(:,end),0))/par.I)/(sum(V(:,end)<30000)/par.I)
+ 
+%%  Upside-Potential
+
+MEAN1   = mean(V(:,end))
+MEDIAN1 = median(V(:,end))
+MAX1    = max(V(:,end))
