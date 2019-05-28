@@ -1,0 +1,176 @@
+%% Backtesting a CPPI product
+% CPPI (Constant Proportion Portfolio insurance)
+% One of the simplest hedging strategy
+
+% This portfolio contains 2 assets : one risk free (tipically, a bond) . The other asset is a risky one, but in practice, only assets with
+% low volatilities (ie, funds) are used. the typical asset is a fund of fund.
+%
+% The basis of this strategy is to warranty an amount at Expiry, but to
+% take advantage of the potential increase of the risky asset. so  CPPI
+% provides downside protection.
+%
+% 3 parameters therefore drive the mechanism :
+% - The warratnied amount (Floor). The less you warranty, the more you can potentially take advantage of the risky asset
+% - the multiplicator : this is the degree of exposure of the bank
+%
+%
+% - Transaction cost : a percentage. If 0.02, then cost to trade 100 is 2
+% hedging is less than this value
+% To avoid too much trading costs, 3 other parameters are set :
+% - A treshold level (for example 0.05) -> we do not hedge if the percentage of
+% hedging is less than this value
+% - A smothing factor After computation opf the volume of asset to hedge,
+% we just trade but we adjust the volume using this smothing factor
+
+%% Clear data
+clear;clc;
+
+%% Set the warrantied amount and fundamental parameters of the CPPI
+Floor = 100;
+MaxMultiplier = 10;
+NumberOfMultiplierStep = 100;
+SmoothingFactor = 0.8;
+TransactionThreshold = 0.02;
+TransactionCost = 0.005;
+HedgingFrequencyInDays = 1;
+
+%% Retrieve the data used for the backtesting
+% We use the Eurstoxx50 in this case
+
+Mode = 'Historical';
+
+[Prices,dates,StartDate,EndDate] = SimpleXlsReader('1998_BackTest.xls');
+
+Returns = Prices(2 :end)./ Prices (1:end - 1) - 1;
+
+%% Set the number of Multiplier to generate the 3D surface
+%Here we just set the nuùmber of multiplier we want to evaluate.
+Multipliers = linspace(1,MaxMultiplier,NumberOfMultiplierStep);
+
+%% Get the risky asset path (to compare with the CPPI evolution)
+NormalizedPrices  = ret2price(Returns,100,  1);
+TimeLength = size(NormalizedPrices,1);
+
+%% Compute the CPPI value for each multiplier
+
+for i = 1 : 1: NumberOfMultiplierStep [PortFolioValue(i,:) , TradedAmount(i,:), PercentageOfTradingDates(i),DynFloor(i,:),Exposure(i,:)]= CPPI_PayOff_From_Returns_2(100, Floor,Multipliers(i),Returns, 0.03,SmoothingFactor, TransactionThreshold, TransactionCost, HedgingFrequencyInDays);
+end;
+
+%% Plot the surface of CCPI value
+
+h1      =    figure;
+set(h1,'WindowStyle','Docked');
+hold on;
+surf(PortFolioValue);
+shading interp;
+set(gca,'YTick',linspace(1 , NumberOfMultiplierStep ,5)');
+set(gca,'YTickLabel',num2str( linspace(1 , MaxMultiplier,5)') );
+dateaxis('x',12,StartDate);
+PlotTitle  = ['BackTesting from ' datestr(StartDate,'dd/mm/yyyy') ' to ' datestr(EndDate,'dd/mm/yyyy')];
+title(PlotTitle);
+zlabel('Performance, on a 100 basis');
+zlim([0.8 * Floor 1.2 * max(max(PortFolioValue))]);
+ylim([1 NumberOfMultiplierStep]);
+xlim([1 TimeLength-1]);
+%zlim([50 max(PercentageOfTradingDates)*1.2]);
+grid on;
+
+ViewPoint = [0.7986   -0.6018    0.0000   -0.0984;    0.2825    0.3749    0.8829   -0.7702; ...  0.5314    0.7052   -0.4695    8.2767;     0         0         0    1.0000];
+view(ViewPoint);
+
+
+%% Plot the risky asset path
+XCoor = (NumberOfMultiplierStep) * ones(TimeLength,1);
+plot3(1 : TimeLength,XCoor ,NormalizedPrices);
+topValue = max(zlim);
+%zlim([1 topValue]);
+
+
+%% Plot the warrantied amount plane in transparency
+% The CPPI si supposed to be always above except incase of big Krach
+FloorPlane = PortFolioValue;
+FloorPlane(:,:) = Floor;
+surf(FloorPlane,'FaceColor','b','EdgeColor','none','FaceAlpha',0.15);
+ylim([1 NumberOfMultiplierStep]);
+
+
+%% Plot the percentage of hedging days for each multiplier
+UntradedDays = (TradedAmount == 0);
+h = figure;
+set(h,'WindowStyle','Docked');
+area(PercentageOfTradingDates');
+hold on;
+
+
+%% Put some labeling 
+grid on;
+set(gca,'XTick',linspace(1 , NumberOfMultiplierStep ,5)');
+set(gca,'XTickLabel',num2str( linspace(1 , MaxMultiplier,5)') );
+ylabel('Percentage of trading dates');
+xlabel('Multiplier');
+title('Percentage of trading dates according to value of Multiplier');
+
+
+%% Plot the surface of the trading amount
+%As expected, the higher is the risk the more we have to hedge, and so the
+%higher are the transaction costs.
+
+h3 = figure;
+set(h3,'WindowStyle','Docked');
+surf(TradedAmount);
+shading interp;
+
+set(gca,'YTick',[1 25 50 75 100']);
+set(gca,'YTickLabel',num2str( linspace(1 , MaxMultiplier,5)' ) );
+
+dateaxis('x',StartDate);
+title('Traded Amount');
+
+grid on;
+ylim([1 100]);
+ylabel('Multiplier');
+xlabel('Time');
+xlim([1 TimeLength]);
+dateaxis('x',12,StartDate);
+zlabel('Traded Amount , on a 100 basis');
+
+
+TotalTradedAmount = sum(TradedAmount,2);
+h4 = figure;
+set(h4,'WindowStyle','Docked');
+plot(TotalTradedAmount );
+grid on;
+set(gca,'XTick',linspace(1 , NumberOfMultiplierStep ,5)');
+set(gca,'XTickLabel',num2str( linspace(1 , MaxMultiplier,5)') );
+ylabel('Total Traded Amount');
+xlabel('Multiplier');
+title('Total Traded Amount depending on the value of Multiplier');
+
+
+%% Bonus -> Let's compare to the Allianz EEP version .... We use the
+% multiplier giving the maximum result
+%[ MaxVal,BestStrategy] = max(PortFolioValue(:,end));
+BestStrategy = 45;
+MaxVal = PortFolioValue(BestStrategy,end);
+h5 = figure;
+set(h5,'WindowStyle','Docked');
+plot(dates(2:end),Prices(2:end)./Prices(1).*100,'k');
+hold on;
+AdjustedDates = dates(2: 1 : 1 + size(PortFolioValue,2));
+plot(AdjustedDates,PortFolioValue(BestStrategy,:),'b');
+plot(AdjustedDates,DynFloor(BestStrategy,:),'r');
+legend(get(h5,'CurrentAxes'),'Risky Asset','CPPI (Best Multiplier)','Floor');
+grid on;
+xlim([AdjustedDates(1) AdjustedDates(end)])
+ylim([80 max(NormalizedPrices)]);
+title(['Performance of the EEP from ' num2str(datestr(StartDate,'dd/mm/yyyy')) ' to ' num2str(datestr(EndDate,'dd/mm/yyyy')) ' for the best Strategy, with a Multplier of ' num2str(Multipliers(BestStrategy))]);
+MyDateTick(12,dates,StartDate,EndDate,60);
+h6 = figure;
+set(h6,'WindowStyle','Docked');
+plot(AdjustedDates,Exposure(BestStrategy,:)./100,'k');
+xlim([AdjustedDates(1) AdjustedDates(end)]);
+MyDateTick(12,dates,StartDate,EndDate,60);
+grid on;
+title(['Exposure of the EEP from ' num2str(datestr(StartDate,'dd/mm/yyyy')) ' to ' num2str(datestr(EndDate,'dd/mm/yyyy'))]);
+ylabel('% of the EEP Exposed');
+disp(['Best Multiplier is ' num2str(Multipliers(BestStrategy)) ' Giving a absolute result of ' num2str(MaxVal - 100) ' % from ' num2str(datestr(StartDate,'dd/mm/yyyy')) ' to ' num2str(datestr(EndDate,'dd/mm/yyyy'))]);
