@@ -39,7 +39,7 @@ HedgingFrequencyInDays = 1;
 
 Mode = 'Historical';
 
-[Prices,dates,StartDate,EndDate] = SimpleXlsReader('1998_BackTest.xls');
+[Prices,dates,StartDate,EndDate] = SimpleXlsReader('your_data.xls');
 
 Returns = Prices(2 :end)./ Prices (1:end - 1) - 1;
 
