@@ -7,7 +7,7 @@ clear;clc;
  
 par.Laufzeit = 30
  
-[idxVals, secNames]     = xlsread('YOUR FILE','Array (e.g. A:A)')
+[idxVals, secNames]     = xlsread('your_data.xlsx','Array (e.g. A:A)')
 log_R     = log(idxVals(2:end)./idxVals(1:end-1));
 
 par.v = std(log_R);
