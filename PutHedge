@@ -21,7 +21,7 @@ par.rf = exp(0.01)/12;
 %%% Function and simulaiton must be defined elsewhere
 [V,R_t] = PutHedge(par);      
 
-%%  Shortfall Maß
+%%  Shortfall Measures
 
 SW1     = sum(V(:,end)<30000)/par.I
 SE1     = sum(max(30000-V(:,end),0))/par.I
